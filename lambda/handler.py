@@ -3,6 +3,7 @@ Claude Personal Assistant — Lambda Handler
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import claude_client
@@ -13,6 +14,12 @@ from secrets import get_secrets
 
 
 def lambda_handler(event, context):
+    """AWS Lambda entry point — receives Telegram webhook and sends a reply.
+
+    Validates the Telegram secret token, parses the incoming message,
+    delegates to _process_message, and sends the reply back via Telegram.
+    Any unhandled exception is caught here so the bot always sends a response.
+    """
     secrets = get_secrets()
 
     # Validate Telegram secret token
@@ -38,7 +45,7 @@ def lambda_handler(event, context):
     print(f"Message from {chat_id}: {text}")
 
     try:
-        reply = _process_message(text, secrets)
+        reply = _process_message(text)
     except Exception as e:
         print(f"Unhandled error: {e}")
         reply = "Sorry, something went wrong on my end. Please try again."
@@ -47,7 +54,16 @@ def lambda_handler(event, context):
     return {"statusCode": 200, "body": "ok"}
 
 
-def _process_message(text, secrets):
+def _process_message(text: str) -> str:
+    """Run the Claude agentic loop for a single user message and return the reply.
+
+    Loads memories from DynamoDB, builds the system prompt with today's date,
+    then repeatedly calls Claude until stop_reason is 'end_turn'. Any tool_use
+    blocks returned by Claude are executed in parallel via ThreadPoolExecutor.
+
+    Args:
+        text: The raw message text sent by the user via Telegram.
+    """
     memories = memory.load_all()
     memory_context = memory.format_for_prompt(memories)
 
@@ -81,18 +97,23 @@ def _process_message(text, secrets):
             print(f"Reply: {reply[:100]}")
             return reply
 
-        # Handle tool calls
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            tool_results.append(_handle_tool(block, text))
+        # Handle tool calls — run in parallel if multiple blocks
+        tool_blocks = [b for b in response.content if b.type == "tool_use"]
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(_handle_tool, block, text) for block in tool_blocks]
+            tool_results = [f.result() for f in futures]
 
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
 
 
-def _handle_tool(block, original_text):
+def _handle_tool(block, original_text: str) -> dict:
+    """Execute a single Claude tool_use block and return the tool_result dict.
+
+    Handles save_memory, delete_memory, and create_calendar_event.
+    Exceptions are caught and returned as an is_error tool_result so the
+    agentic loop can continue and Claude can inform the user of the failure.
+    """
     try:
         if block.name == "save_memory":
             inp = block.input
