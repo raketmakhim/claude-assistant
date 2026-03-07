@@ -71,12 +71,11 @@ def _process_message(text: str) -> str:
     system_prompt = (
         f"You are a helpful personal assistant. Be concise and friendly. "
         f"Today's date is {today}. Use this to resolve relative dates like 'tomorrow', 'next Friday', 'end of month'. "
-        f"When the user mentions an appointment, meeting, or event: use create_calendar_event — it saves to memory automatically, do NOT also call save_memory. "
-        f"When the user shares personal info or preferences worth remembering (not a calendar event): use save_memory. "
-        f"When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically."
+        f"CALENDAR RULE: If something involves a date or time — appointments, meetings, reminders, tasks, deadlines, calls — ALWAYS use create_calendar_event. It saves to memory automatically, so do NOT also call save_memory. "
+        f"MEMORY RULE: Use save_memory only for timeless facts with no specific date — e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
+        f"DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically."
     )
-    if memory_context:
-        system_prompt += f"\n\n{memory_context}"
+    system_prompt += f"\n\n{memory_context}" if memory_context else "\n\nMemory database: empty — nothing saved yet."
 
     claude = claude_client.get_client()
     messages = [{"role": "user", "content": text}]
@@ -86,7 +85,7 @@ def _process_message(text: str) -> str:
         response = claude.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             tools=claude_client.TOOLS,
             messages=messages,
         )

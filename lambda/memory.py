@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import boto3
 
@@ -46,6 +46,9 @@ def write(label: str, memory_type: str, date: str | None = None, raw: str | None
         item["date"] = date
     if calendar_event_id:
         item["calendar_event_id"] = calendar_event_id
+        # Auto-expire calendar events from memory 1 day after the event date
+        event_dt = datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)
+        item["expires_at"] = int(event_dt.timestamp())
     table.put_item(Item=item)
     print(f"Memory saved: {label}")
     return item
