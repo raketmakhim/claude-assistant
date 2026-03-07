@@ -171,11 +171,6 @@ def _handle_tool(block, original_text: str) -> dict:
             REVIEW_SCHEDULE = {0: [7, 30], 7: [30], 30: []}
             today = datetime.now(timezone.utc).date()
 
-            # Save today's study session to memory
-            session_label = f"Study: {topic} — Day {day}"
-            memory.write(label=session_label, memory_type="fact", raw=original_text)
-            results = [f"Saved: {session_label}"]
-
             # Schedule future review reminders — run in parallel if multiple
             def _create_review(next_day):
                 days_to_add = next_day - day
@@ -190,6 +185,8 @@ def _handle_tool(block, original_text: str) -> dict:
                     calendar_event_id=cal_result.get("id"),
                 )
                 return f"Scheduled: {review_title} on {review_date}"
+
+            results = []
 
             next_days = REVIEW_SCHEDULE.get(day, [])
             if next_days:
