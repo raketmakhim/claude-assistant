@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Lambda — ignore all installed packages, keep only source files
+lambda/*
+!lambda/handler.py
+!lambda/secrets.py
+!lambda/telegram.py
+!lambda/google_calendar.py
+!lambda/memory.py
+!lambda/claude_client.py
+
+# Lambda build artefact
+lambda.zip
+
+# Terraform
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfstate.*.backup
+terraform/.terraform.lock.hcl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local planning docs
+High Level Plan.md
+Project context
