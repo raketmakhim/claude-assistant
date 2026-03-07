@@ -4,7 +4,7 @@ Claude Personal Assistant — Lambda Handler
 
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import claude_client
 import google_calendar
@@ -73,7 +73,8 @@ def _process_message(text: str) -> str:
         f"Today's date is {today}. Use this to resolve relative dates like 'tomorrow', 'next Friday', 'end of month'. "
         f"CALENDAR RULE: If something involves a date or time — appointments, meetings, reminders, tasks, deadlines, calls — ALWAYS use create_calendar_event. It saves to memory automatically, so do NOT also call save_memory. "
         f"MEMORY RULE: Use save_memory only for timeless facts with no specific date — e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
-        f"DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically."
+        f"DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically. "
+        f"STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics."
     )
     system_prompt += f"\n\n{memory_context}" if memory_context else "\n\nMemory database: empty — nothing saved yet."
 
@@ -160,6 +161,51 @@ def _handle_tool(block, original_text: str) -> dict:
                 "type": "tool_result",
                 "tool_use_id": block.id,
                 "content": f"Calendar event '{inp['title']}' created for {inp['date']} and saved to memory.",
+            }
+
+        elif block.name == "schedule_study_review":
+            inp = block.input
+            topic = inp["topic"]
+            day = inp["day"]
+
+            REVIEW_SCHEDULE = {0: [7, 30], 7: [30], 30: []}
+            today = datetime.now(timezone.utc).date()
+
+            # Save today's study session to memory
+            session_label = f"Study: {topic} — Day {day}"
+            memory.write(label=session_label, memory_type="fact", raw=original_text)
+            results = [f"Saved: {session_label}"]
+
+            # Schedule future review reminders — run in parallel if multiple
+            def _create_review(next_day):
+                days_to_add = next_day - day
+                review_date = (today + timedelta(days=days_to_add)).strftime("%Y-%m-%d")
+                review_title = f"Study: {topic} — Day {next_day} review"
+                cal_result = google_calendar.create_event(title=review_title, date=review_date)
+                memory.write(
+                    label=f"{review_title} on {review_date}",
+                    memory_type="event",
+                    date=review_date,
+                    raw=original_text,
+                    calendar_event_id=cal_result.get("id"),
+                )
+                return f"Scheduled: {review_title} on {review_date}"
+
+            next_days = REVIEW_SCHEDULE.get(day, [])
+            if next_days:
+                with ThreadPoolExecutor() as executor:
+                    futures = [executor.submit(_create_review, nd) for nd in next_days]
+                    results.extend(f.result() for f in futures)
+
+            # Mark as mastered after Day 30
+            if day == 30:
+                memory.write(label=f"Mastered: {topic}", memory_type="fact", raw=original_text)
+                results.append(f"Marked as mastered: {topic}")
+
+            return {
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": "; ".join(results),
             }
 
     except Exception as e:
