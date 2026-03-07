@@ -80,8 +80,9 @@ def _process_message(text: str) -> str:
 
     claude = claude_client.get_client()
     messages = [{"role": "user", "content": text}]
+    max_iterations = 10
 
-    while True:
+    for _ in range(max_iterations):
         response = claude.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
@@ -105,6 +106,9 @@ def _process_message(text: str) -> str:
 
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results})
+
+    print(f"Agentic loop exceeded {max_iterations} iterations — aborting")
+    return "Sorry, I got stuck processing that. Please try again."
 
 
 def _handle_tool(block, original_text: str) -> dict:
