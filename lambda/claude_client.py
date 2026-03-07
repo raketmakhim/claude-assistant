@@ -69,6 +69,32 @@ TOOLS = [
         },
     },
     {
+        "name": "schedule_study_review",
+        "description": (
+            "Record that the user studied a topic today and schedule spaced-repetition review reminders. "
+            "Use when the user says they studied, learned, or revised a topic. "
+            "Day 0 = studied today (schedules Day 7 and Day 30 reminders). "
+            "Day 7 = completing first review (schedules Day 30 reminder only). "
+            "Day 30 = completing final review (marks topic as mastered, no more reminders). "
+            "Do NOT use save_memory or create_calendar_event separately for study topics."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "The topic or subject that was studied. e.g. 'Python decorators', 'French vocabulary chapter 3'",
+                },
+                "day": {
+                    "type": "integer",
+                    "enum": [0, 7, 30],
+                    "description": "Which review day: 0 = first time studied today, 7 = first review, 30 = final review.",
+                },
+            },
+            "required": ["topic", "day"],
+        },
+    },
+    {
         "name": "save_memory",
         "description": (
             "Save a timeless fact about the user — something with no specific date. "
