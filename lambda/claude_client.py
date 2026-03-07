@@ -36,10 +36,10 @@ TOOLS = [
     {
         "name": "create_calendar_event",
         "description": (
-            "Create an event on Google Calendar and save it to memory. "
-            "Use this when the user wants to be reminded of something or add an event to their calendar. "
-            "Always resolve the date and time yourself — never ask the user for a formatted date. "
-            "This automatically saves to memory too, so do NOT separately call save_memory for calendar events."
+            "Create a Google Calendar event and save it to memory. "
+            "Use this for ANYTHING with a date or time: appointments, meetings, reminders, tasks, calls, deadlines — if it has a date, it goes here. "
+            "Always resolve the date and time yourself from context — never ask the user for a formatted date. "
+            "This saves to memory automatically, so do NOT also call save_memory."
         ),
         "input_schema": {
             "type": "object",
@@ -71,10 +71,9 @@ TOOLS = [
     {
         "name": "save_memory",
         "description": (
-            "Save an important fact or reminder to long-term memory (not a calendar event). "
-            "Use this for personal info, preferences, and facts worth remembering — "
-            "e.g. 'user is vegetarian', 'sister's name is Sarah', 'prefers morning calls'. "
-            "Do NOT use this for calendar events — create_calendar_event handles memory for those automatically."
+            "Save a timeless fact about the user — something with no specific date. "
+            "e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
+            "Do NOT use this for anything with a date or time — use create_calendar_event instead."
         ),
         "input_schema": {
             "type": "object",
@@ -85,8 +84,8 @@ TOOLS = [
                 },
                 "type": {
                     "type": "string",
-                    "enum": ["reminder", "event", "fact"],
-                    "description": "reminder = action to take, event = date/occasion, fact = general info",
+                    "enum": ["fact"],
+                    "description": "Always 'fact' — timeless personal info with no date.",
                 },
                 "date": {
                     "type": "string",
@@ -95,5 +94,6 @@ TOOLS = [
             },
             "required": ["label", "type"],
         },
+        "cache_control": {"type": "ephemeral"},
     },
 ]
