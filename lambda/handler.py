@@ -2,15 +2,18 @@
 Claude Personal Assistant — Lambda Handler
 """
 
-import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
 import claude_client
 import google_calendar
 import memory
-import telegram
+from messenger import Messenger
+from telegram import TelegramMessenger
 from secrets import get_secrets
+
+# Swap this line to use a different messaging platform
+_messenger: Messenger = TelegramMessenger()
 
 
 def lambda_handler(event, context):
@@ -22,24 +25,12 @@ def lambda_handler(event, context):
     """
     secrets = get_secrets()
 
-    # Validate Telegram secret token
-    headers = event.get("headers", {})
-    token = headers.get("x-telegram-bot-api-secret-token", "")
-    if token != secrets.get("TELEGRAM_SECRET_TOKEN", ""):
+    if not _messenger.validate_token(event.get("headers", {}), secrets.get("TELEGRAM_SECRET_TOKEN", "")):
         print("Rejected: invalid secret token")
         return {"statusCode": 403, "body": "Forbidden"}
 
-    # Parse Telegram update
-    body = json.loads(event.get("body", "{}"))
-    message = body.get("message", {})
-
-    if not message:
-        return {"statusCode": 200, "body": "ok"}
-
-    chat_id = message.get("chat", {}).get("id")
-    text = message.get("text", "")
-
-    if not text or not chat_id:
+    chat_id, text = _messenger.parse_update(event.get("body", ""))
+    if not chat_id or not text:
         return {"statusCode": 200, "body": "ok"}
 
     print(f"Message from {chat_id}: {text}")
@@ -50,7 +41,7 @@ def lambda_handler(event, context):
         print(f"Unhandled error: {e}")
         reply = "Sorry, something went wrong on my end. Please try again."
 
-    telegram.send_message(secrets["TELEGRAM_BOT_TOKEN"], chat_id, reply)
+    _messenger.send_message(secrets["TELEGRAM_BOT_TOKEN"], chat_id, reply)
     return {"statusCode": 200, "body": "ok"}
 
 
