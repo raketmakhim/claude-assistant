@@ -95,6 +95,29 @@ TOOLS = [
         },
     },
     {
+        "name": "search_memories",
+        "description": (
+            "Search saved events and reminders within a date range. "
+            "Use this when the user asks about upcoming events or a specific time period — "
+            "e.g. 'what do I have this week?', 'what's on next month?', 'any events in March?'. "
+            "Always resolve relative dates (today, this week, next month) to ISO dates yourself before calling."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_date": {
+                    "type": "string",
+                    "description": "Start of date range, ISO format (YYYY-MM-DD), inclusive.",
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "End of date range, ISO format (YYYY-MM-DD), inclusive.",
+                },
+            },
+            "required": ["start_date", "end_date"],
+        },
+    },
+    {
         "name": "save_memory",
         "description": (
             "Save a timeless fact about the user — something with no specific date. "

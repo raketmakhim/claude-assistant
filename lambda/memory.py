@@ -73,15 +73,27 @@ def delete(memory_id: str) -> None:
     print(f"Memory deleted: {memory_id}")
 
 
-def format_for_prompt(memories):
+
+def format_for_prompt(memories: list[dict]) -> str:
+    """Format memories for inclusion in the Claude system prompt.
+
+    Facts (no date) are always included. Past events (date before today)
+    are omitted — only upcoming events are shown.
+    """
     if not memories:
         return ""
+    today = datetime.now(timezone.utc).date().isoformat()
     lines = ["Things I remember about you (ID shown for deletion reference):"]
     for m in memories:
+        item_date = m.get("date")
+        if item_date and item_date < today:
+            continue  # skip past events
         line = f"- [id:{m['id']}] {m['label']}"
-        if m.get("date"):
-            line += f" ({m['date']})"
+        if item_date:
+            line += f" ({item_date})"
         if m.get("calendar_event_id"):
             line += " [has calendar event]"
         lines.append(line)
+    if len(lines) == 1:
+        return ""  # only header, no items passed the filter
     return "\n".join(lines)

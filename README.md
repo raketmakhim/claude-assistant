@@ -1,14 +1,18 @@
 # Claude Personal Assistant
 
-A personal AI assistant powered by Claude, accessible via Telegram. Remembers important information across sessions and creates Google Calendar events on your behalf.
+A personal AI assistant powered by Claude, accessible via Telegram. Remembers facts across sessions, creates Google Calendar events, and schedules spaced-repetition study reviews.
 
 ---
 
 ## Features
 
 - **Chat** — natural conversation via Telegram on any device
-- **Persistent memory** — remembers facts, dates, and preferences across sessions (stored in DynamoDB)
-- **Google Calendar** — creates and deletes calendar events from natural language
+- **Persistent memory** — remembers facts and preferences across sessions (stored in DynamoDB)
+- **Google Calendar** — creates and deletes calendar events from natural language, no details required
+- **Spaced repetition** — log a study session and automatically schedule Day 7 and Day 30 review reminders
+- **Parallel tool execution** — multiple tool calls (e.g. create several events at once) run concurrently
+- **Prompt caching** — reduces Claude API costs on repeated requests
+- **Auto-expiry** — calendar-linked memories expire from DynamoDB one day after the event date
 - **Error resilience** — tool failures are caught and reported; the bot always replies
 
 ---
@@ -23,9 +27,9 @@ A personal AI assistant powered by Claude, accessible via Telegram. Remembers im
       │
       ▼
 [AWS Lambda]
-      ├── [Claude API]         — understands message, calls tools
-      ├── [DynamoDB]           — reads/writes persistent memories
-      └── [Google Calendar]   — creates/deletes events
+      ├── [Claude API]         — understands message, decides which tools to call
+      ├── [DynamoDB]           — reads/writes persistent memories (with TTL)
+      └── [Google Calendar]   — creates/deletes events via service account
       │
       ▼
 [Telegram API]  →  sends reply to user
@@ -37,9 +41,9 @@ A personal AI assistant powered by Claude, accessible via Telegram. Remembers im
 
 | Service | Role |
 |---|---|
-| **Lambda** | Core backend — handles messages, calls Claude, executes tools |
+| **Lambda** | Core backend — handles messages, runs Claude agentic loop, executes tools |
 | **API Gateway** | Receives Telegram webhook (HTTP POST) |
-| **DynamoDB** | Persistent memory store |
+| **DynamoDB** | Persistent memory store with TTL auto-expiry |
 | **Secrets Manager** | Stores all API keys securely |
 | **IAM** | Least-privilege roles between services |
 | **CloudWatch** | Lambda logs (30-day retention) |
@@ -50,11 +54,11 @@ A personal AI assistant powered by Claude, accessible via Telegram. Remembers im
 
 ```
 ├── lambda/
-│   ├── handler.py          # Lambda entry point
+│   ├── handler.py          # Lambda entry point + agentic loop + tool dispatch
 │   ├── claude_client.py    # Anthropic client + tool definitions
 │   ├── google_calendar.py  # Google Calendar API (create/delete events)
-│   ├── memory.py           # DynamoDB read/write/delete
-│   ├── secrets.py          # AWS Secrets Manager (cached)
+│   ├── memory.py           # DynamoDB read/write/delete (with cascade calendar delete)
+│   ├── secrets.py          # AWS Secrets Manager (cached across warm invocations)
 │   └── telegram.py         # Telegram Bot API (send messages)
 │
 ├── terraform/
@@ -111,6 +115,7 @@ In AWS Secrets Manager, set the secret value to:
 
 `GOOGLE_SERVICE_ACCOUNT` is the full JSON key file downloaded from Google Cloud Console.
 `GOOGLE_CALENDAR_ID` is found in Google Calendar → Settings → your calendar → Integrate calendar.
+Share your calendar with the service account email and grant it "Make changes to events" permission.
 
 ### 3. Install Lambda dependencies
 
@@ -138,11 +143,20 @@ terraform apply
 
 ## Claude Tools
 
-| Tool | Trigger | Effect |
+| Tool | When Claude uses it | Effect |
 |---|---|---|
-| `create_calendar_event` | Appointment or event mentioned | Creates Google Calendar event + saves to memory |
-| `save_memory` | Personal info or preference shared | Writes to DynamoDB |
-| `delete_memory` | "Forget / cancel / delete that" | Removes from DynamoDB + deletes linked calendar event |
+| `create_calendar_event` | Any message with a date or time | Creates Google Calendar event + saves to DynamoDB (with TTL) |
+| `save_memory` | Timeless facts or preferences | Writes to DynamoDB (no expiry) |
+| `delete_memory` | "Forget / cancel / delete that" | Removes from DynamoDB + deletes linked Google Calendar event |
+| `schedule_study_review` | "I studied X today" / "Day 7 review of X" | Saves study session + schedules future review reminders in calendar |
+
+### Spaced Repetition Logic
+
+| Day reported | Reminders created |
+|---|---|
+| Day 0 (studied today) | Day 7 review + Day 30 review (parallel calendar events) |
+| Day 7 (first review done) | Day 30 review only |
+| Day 30 (final review done) | None — topic marked as Mastered in memory |
 
 ---
 
@@ -151,9 +165,44 @@ terraform apply
 | Field | Type | Description |
 |---|---|---|
 | `id` | String (PK) | UUID |
-| `type` | String | `fact` / `event` / `reminder` |
+| `type` | String | `fact` or `event` |
 | `label` | String | Human-readable description |
 | `date` | String | ISO date if applicable |
 | `created_at` | String | ISO timestamp |
 | `raw` | String | Original user message |
 | `calendar_event_id` | String | Google Calendar event ID (if linked) |
+| `expires_at` | Number | Unix timestamp for DynamoDB TTL (calendar-linked items only) |
+
+---
+
+## Potential Future Features
+
+### High value / easy to add
+
+| Feature | Description |
+|---|---|
+| **Daily briefing** | Scheduled Lambda (EventBridge) that messages you each morning with today's calendar events and any study reviews due |
+| **Recurring events** | "Remind me every Monday at 9am to review emails" — uses Google Calendar recurrence rules |
+| **Smart search** | "What do I have this week?" — queries DynamoDB by date range instead of dumping all memories |
+
+### Medium effort
+
+| Feature | Description |
+|---|---|
+| **Habit tracking** | "I went to the gym today" — tracks streaks, reminds you if you miss days |
+| **Budget / expense logging** | "Spent £40 on groceries" — stores categorised expenses, can summarise monthly spend |
+| **Contact notes** | "John likes coffee, works at Acme, met at conference" — rich people memory beyond just facts |
+
+### Bigger features
+
+| Feature | Description |
+|---|---|
+| **Voice messages** | Telegram supports audio — transcribe with AWS Transcribe then pass text to Claude as normal |
+| **Web search** | Give Claude a search tool (Tavily/Brave API) so it can answer questions beyond its training data |
+| **Image understanding** | Telegram lets you send photos — Claude is multimodal, so you could ask "what's in this receipt?" and auto-log expenses |
+
+---
+
+## Model
+
+Uses `claude-sonnet-4-6` — chosen for reliable instruction-following and accurate tool batching (e.g. sending multiple delete calls in one response for parallel execution).
