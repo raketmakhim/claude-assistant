@@ -1,21 +1,32 @@
-# Single secret holding all API keys as a JSON object
-resource "aws_secretsmanager_secret" "api_keys" {
-  name                    = "${var.project_name}/api-keys"
-  description             = "API keys for Claude, Telegram, and Google Calendar"
-  recovery_window_in_days = 0 # Allow immediate deletion (useful during dev)
+# Single SecureString parameter holding all API keys as a JSON object
+# Standard tier — free (unlike Secrets Manager at $0.40/month)
+resource "aws_ssm_parameter" "api_keys" {
+  name        = "/${var.project_name}/api-keys"
+  type        = "SecureString"
+  description = "API keys for Claude, Telegram, and Google Calendar"
+
+  # Placeholder — update manually in AWS Console after deploy
+  # Never put real keys in Terraform files
+  value = jsonencode({
+    CLAUDE_API_KEY        = "REPLACE_ME"
+    TELEGRAM_BOT_TOKEN    = "REPLACE_ME"
+    TELEGRAM_SECRET_TOKEN = "REPLACE_ME"
+    GOOGLE_CALENDAR_ID    = "REPLACE_ME"
+  })
+
+  lifecycle {
+    ignore_changes = [value] # prevent Terraform overwriting manually set values
+  }
 }
 
-# Placeholder values — update these manually in AWS Console after deploy
-# Never put real keys in Terraform files
-# resource "aws_secretsmanager_secret_version" "api_keys" {
-#   secret_id = aws_secretsmanager_secret.api_keys.id
+# Google service account JSON stored separately to avoid nesting issues
+resource "aws_ssm_parameter" "google_service_account" {
+  name        = "/${var.project_name}/google-service-account"
+  type        = "SecureString"
+  description = "Google service account JSON key for Calendar API"
+  value       = "REPLACE_ME"
 
-#   secret_string = jsonencode({
-#     CLAUDE_API_KEY          = "REPLACE_ME"
-#     TELEGRAM_BOT_TOKEN      = "REPLACE_ME"
-#     TELEGRAM_SECRET_TOKEN   = "REPLACE_ME"
-#     GOOGLE_CLIENT_ID        = "REPLACE_ME"
-#     GOOGLE_CLIENT_SECRET    = "REPLACE_ME"
-#     GOOGLE_REFRESH_TOKEN    = "REPLACE_ME"
-#   })
-# }
+  lifecycle {
+    ignore_changes = [value]
+  }
+}

@@ -101,7 +101,7 @@ Note the `webhook_url` output.
 
 ### 2. Add secrets
 
-In AWS Secrets Manager, set the secret value to:
+In AWS Console → **Systems Manager → Parameter Store → `/{project-name}/api-keys`**, set the value to:
 
 ```json
 {
@@ -116,6 +116,8 @@ In AWS Secrets Manager, set the secret value to:
 `GOOGLE_SERVICE_ACCOUNT` is the full JSON key file downloaded from Google Cloud Console.
 `GOOGLE_CALENDAR_ID` is found in Google Calendar → Settings → your calendar → Integrate calendar.
 Share your calendar with the service account email and grant it "Make changes to events" permission.
+
+> **Note:** SSM Parameter Store standard tier is free. Secrets Manager costs $0.40/secret/month.
 
 ### 3. Install Lambda dependencies
 
