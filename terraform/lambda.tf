@@ -18,8 +18,9 @@ resource "aws_lambda_function" "assistant" {
   
   environment {
     variables = {
-      SECRETS_ARN    = aws_secretsmanager_secret.api_keys.arn
-      DYNAMODB_TABLE = aws_dynamodb_table.memories.name
+      SECRETS_PATH    = aws_ssm_parameter.api_keys.name
+      GOOGLE_SA_PATH  = aws_ssm_parameter.google_service_account.name
+      DYNAMODB_TABLE  = aws_dynamodb_table.memories.name
       AWS_REGION_NAME = var.aws_region
     }
   }

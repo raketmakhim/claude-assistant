@@ -1,5 +1,8 @@
 import json
+import time
 import urllib.request
+
+MESSAGE_MAX_AGE_SECONDS = 30
 
 
 class TelegramMessenger:
@@ -20,6 +23,10 @@ class TelegramMessenger:
         chat_id = message.get("chat", {}).get("id")
         text = message.get("text", "")
         if not chat_id or not text:
+            return None, None
+        # Discard stale messages from Telegram's retry queue
+        if time.time() - message.get("date", 0) > MESSAGE_MAX_AGE_SECONDS:
+            print(f"Discarding stale message (age {int(time.time() - message.get('date', 0))}s)")
             return None, None
         return chat_id, text
 

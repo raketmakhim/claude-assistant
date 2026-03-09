@@ -49,7 +49,7 @@ resource "aws_iam_role_policy_attachment" "dynamodb_access" {
   policy_arn = aws_iam_policy.dynamodb_access.arn
 }
 
-# Allow Lambda to read secrets from Secrets Manager
+# Allow Lambda to read secrets from SSM Parameter Store
 resource "aws_iam_policy" "secrets_access" {
   name = "${var.project_name}-secrets-policy"
 
@@ -57,11 +57,12 @@ resource "aws_iam_policy" "secrets_access" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter", "ssm:GetParameters"]
+        Resource = [
+          aws_ssm_parameter.api_keys.arn,
+          aws_ssm_parameter.google_service_account.arn,
         ]
-        Resource = aws_secretsmanager_secret.api_keys.arn
       }
     ]
   })
