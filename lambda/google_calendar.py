@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta
 
 from googleapiclient.discovery import build
@@ -19,8 +18,6 @@ def get_calendar_service():
     if _calendar_service is None:
         secrets = get_secrets()
         service_account_info = secrets["GOOGLE_SERVICE_ACCOUNT"]
-        if isinstance(service_account_info, str):
-            service_account_info = json.loads(service_account_info)
         creds = service_account.Credentials.from_service_account_info(
             service_account_info,
             scopes=["https://www.googleapis.com/auth/calendar"],

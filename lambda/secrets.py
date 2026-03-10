@@ -21,5 +21,9 @@ def get_secrets() -> dict:
         )
         params = {p["Name"]: p["Value"] for p in response["Parameters"]}
         _secrets = json.loads(params[os.environ["SECRETS_PATH"]])
-        _secrets["GOOGLE_SERVICE_ACCOUNT"] = params[os.environ["GOOGLE_SA_PATH"]]
+        sa_value = params[os.environ["GOOGLE_SA_PATH"]]
+        # Handle double-encoded JSON (value stored as a JSON string in SSM)
+        sa_parsed = json.loads(sa_value)
+        _secrets["GOOGLE_SERVICE_ACCOUNT"] = json.loads(sa_parsed) if isinstance(sa_parsed, str) else sa_parsed
     return _secrets
+
