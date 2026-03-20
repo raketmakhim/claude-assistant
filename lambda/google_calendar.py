@@ -76,6 +76,57 @@ def create_event(title: str, date: str, time: str | None = None, duration_minute
     return result
 
 
+def create_recurring_event(title: str, date: str, frequency: str, time: str | None = None, duration_minutes: int = 60, description: str | None = None, reminder_minutes: int = 60) -> dict:
+    """Create a recurring Google Calendar event and return the API response.
+
+    Args:
+        title: Event summary shown in the calendar.
+        date: ISO date string (YYYY-MM-DD) for the first occurrence.
+        frequency: Recurrence frequency — 'daily', 'weekly', or 'monthly'.
+        time: Optional start time in HH:MM 24-hour format.
+        duration_minutes: Length of a timed event in minutes (default 60).
+        description: Optional event body text.
+        reminder_minutes: Minutes before the event to trigger a popup reminder.
+    """
+    service = get_calendar_service()
+    secrets = get_secrets()
+    calendar_id = secrets.get("GOOGLE_CALENDAR_ID", "primary")
+
+    rrule = f"RRULE:FREQ={frequency.upper()}"
+
+    if time:
+        start_dt = datetime.strptime(f"{date}T{time}:00", "%Y-%m-%dT%H:%M:%S")
+        end_dt = start_dt + timedelta(minutes=duration_minutes)
+        event = {
+            "summary": title,
+            "start": {"dateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Europe/London"},
+            "end": {"dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Europe/London"},
+            "recurrence": [rrule],
+            "reminders": {
+                "useDefault": False,
+                "overrides": [{"method": "popup", "minutes": reminder_minutes}],
+            },
+        }
+    else:
+        event = {
+            "summary": title,
+            "start": {"date": date},
+            "end": {"date": date},
+            "recurrence": [rrule],
+            "reminders": {
+                "useDefault": False,
+                "overrides": [{"method": "popup", "minutes": reminder_minutes}],
+            },
+        }
+
+    if description:
+        event["description"] = description
+
+    result = service.events().insert(calendarId=calendar_id, body=event, sendUpdates="none").execute()
+    print(f"Recurring calendar event created: {result.get('htmlLink')}")
+    return result
+
+
 def delete_event(calendar_event_id: str) -> None:
     """Permanently delete a Google Calendar event by its event ID."""
     service = get_calendar_service()

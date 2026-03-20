@@ -118,6 +118,46 @@ TOOLS = [
         },
     },
     {
+        "name": "create_recurring_event",
+        "description": (
+            "Create a recurring Google Calendar event that repeats on a regular schedule. "
+            "Use this when the user says something like 'every week', 'every day', 'every month', or 'recurring'. "
+            "Do NOT use create_calendar_event for recurring events — use this tool instead. "
+            "This saves to memory automatically, so do NOT also call save_memory."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Event title. e.g. 'Weekly team standup'",
+                },
+                "date": {
+                    "type": "string",
+                    "description": "ISO date of the first occurrence (YYYY-MM-DD)",
+                },
+                "frequency": {
+                    "type": "string",
+                    "enum": ["daily", "weekly", "monthly"],
+                    "description": "How often the event repeats.",
+                },
+                "time": {
+                    "type": "string",
+                    "description": "Time in HH:MM 24-hour format. Omit for all-day events.",
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Duration in minutes for timed events (default 60).",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional extra details for the event.",
+                },
+            },
+            "required": ["title", "date", "frequency"],
+        },
+    },
+    {
         "name": "save_memory",
         "description": (
             "Save a timeless fact about the user — something with no specific date. "
