@@ -72,7 +72,14 @@ def _process_message(text: str) -> str:
     dynamic_memory = f"Today's date: {today}\n\n" + (memory_context if memory_context else "Memory database: empty — nothing saved yet.")
 
     claude = claude_client.get_client()
-    messages = [{"role": "user", "content": text}]
+    last_convo = memory.load_last_conversation()
+    messages = []
+    if last_convo:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(last_convo["created_at"])
+        if age.total_seconds() < 600:  # only include if within the last 10 minutes
+            messages.append({"role": "user", "content": last_convo["user"]})
+            messages.append({"role": "assistant", "content": last_convo["assistant"]})
+    messages.append({"role": "user", "content": text})
     max_iterations = 10
 
     for _ in range(max_iterations):
@@ -92,6 +99,7 @@ def _process_message(text: str) -> str:
                 (b.text for b in response.content if b.type == "text"), ""
             )
             print(f"Reply: {reply[:100]}")
+            memory.save_last_conversation(text, reply)
             return reply
 
         # Handle tool calls — run in parallel if multiple blocks

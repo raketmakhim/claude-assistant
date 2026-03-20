@@ -74,6 +74,28 @@ def delete(memory_id: str) -> None:
 
 
 
+_CONVERSATION_ID = "__conversation__"
+
+
+def save_last_conversation(user_msg: str, assistant_reply: str) -> None:
+    """Overwrite the single last-conversation item in DynamoDB."""
+    table = get_dynamodb().Table(os.environ["DYNAMODB_TABLE"])
+    table.put_item(Item={
+        "id": _CONVERSATION_ID,
+        "type": "conversation",
+        "user": user_msg,
+        "assistant": assistant_reply,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+def load_last_conversation() -> dict | None:
+    """Return the last conversation item, or None if none exists."""
+    table = get_dynamodb().Table(os.environ["DYNAMODB_TABLE"])
+    response = table.get_item(Key={"id": _CONVERSATION_ID})
+    return response.get("Item")
+
+
 def format_for_prompt(memories: list[dict]) -> str:
     """Format memories for inclusion in the Claude system prompt.
 
@@ -85,6 +107,8 @@ def format_for_prompt(memories: list[dict]) -> str:
     today = datetime.now(timezone.utc).date().isoformat()
     lines = ["Things I remember about you (ID shown for deletion reference):"]
     for m in memories:
+        if m.get("type") == "conversation":
+            continue
         item_date = m.get("date")
         if item_date and item_date < today:
             continue  # skip past events
