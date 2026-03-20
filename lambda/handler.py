@@ -59,7 +59,7 @@ def _process_message(text: str) -> str:
     memory_context = memory.format_for_prompt(memories)
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    system_prompt = (
+    static_rules = (
         f"You are a helpful personal assistant. Be concise and friendly. "
         f"Today's date is {today}. Use this to resolve relative dates like 'tomorrow', 'next Friday', 'end of month'. "
         f"CALENDAR RULE: If something involves a date or time — appointments, meetings, reminders, tasks, deadlines, calls — ALWAYS use create_calendar_event. It saves to memory automatically, so do NOT also call save_memory. "
@@ -68,7 +68,7 @@ def _process_message(text: str) -> str:
         f"STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics. "
         f"SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above."
     )
-    system_prompt += f"\n\n{memory_context}" if memory_context else "\n\nMemory database: empty — nothing saved yet."
+    dynamic_memory = memory_context if memory_context else "Memory database: empty — nothing saved yet."
 
     claude = claude_client.get_client()
     messages = [{"role": "user", "content": text}]
@@ -78,7 +78,10 @@ def _process_message(text: str) -> str:
         response = claude.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1024,
-            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            system=[
+                {"type": "text", "text": static_rules, "cache_control": {"type": "ephemeral"}},
+                {"type": "text", "text": dynamic_memory},
+            ],
             tools=claude_client.TOOLS,
             messages=messages,
         )
