@@ -65,7 +65,8 @@ def _process_message(text: str) -> str:
         "MEMORY RULE: Use save_memory only for timeless facts with no specific date — e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
         "DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically. "
         "STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics. "
-        "SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above."
+        "SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above. "
+        "RECURRING RULE: When the user says 'every week', 'every day', 'every month', or 'recurring', use create_recurring_event instead of create_calendar_event."
     )
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     dynamic_memory = f"Today's date: {today}\n\n" + (memory_context if memory_context else "Memory database: empty — nothing saved yet.")
@@ -156,6 +157,29 @@ def _handle_tool(block, original_text: str, memories: list[dict]) -> dict:
                 "type": "tool_result",
                 "tool_use_id": block.id,
                 "content": f"Calendar event '{inp['title']}' created for {inp['date']} and saved to memory.",
+            }
+
+        elif block.name == "create_recurring_event":
+            inp = block.input
+            result = google_calendar.create_recurring_event(
+                title=inp["title"],
+                date=inp["date"],
+                frequency=inp["frequency"],
+                time=inp.get("time"),
+                duration_minutes=inp.get("duration_minutes", 60),
+                description=inp.get("description"),
+            )
+            time_str = f" at {inp['time']}" if inp.get("time") else ""
+            memory.write(
+                label=f"{inp['title']} (every {inp['frequency']}, starting {inp['date']}{time_str})",
+                memory_type="fact",
+                raw=original_text,
+                calendar_event_id=result.get("id"),
+            )
+            return {
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": f"Recurring {inp['frequency']} event '{inp['title']}' created starting {inp['date']} and saved to memory.",
             }
 
         elif block.name == "search_memories":
