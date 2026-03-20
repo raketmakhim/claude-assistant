@@ -143,6 +143,12 @@ TOOLS = [
             },
             "required": ["label", "type"],
         },
-        "cache_control": {"type": "ephemeral"},
     },
 ]
+
+
+def get_tools() -> list[dict]:
+    """Return TOOLS with cache_control on the last entry."""
+    tools = [t.copy() for t in TOOLS]
+    tools[-1] = {**tools[-1], "cache_control": {"type": "ephemeral"}}
+    return tools
