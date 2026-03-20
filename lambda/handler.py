@@ -58,17 +58,17 @@ def _process_message(text: str) -> str:
     memories = memory.load_all()
     memory_context = memory.format_for_prompt(memories)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     static_rules = (
-        f"You are a helpful personal assistant. Be concise and friendly. "
-        f"Today's date is {today}. Use this to resolve relative dates like 'tomorrow', 'next Friday', 'end of month'. "
-        f"CALENDAR RULE: If something involves a date or time — appointments, meetings, reminders, tasks, deadlines, calls — ALWAYS use create_calendar_event. It saves to memory automatically, so do NOT also call save_memory. "
-        f"MEMORY RULE: Use save_memory only for timeless facts with no specific date — e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
-        f"DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically. "
-        f"STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics. "
-        f"SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above."
+        "You are a helpful personal assistant. Be concise and friendly. "
+        "Use today's date (provided in the context below) to resolve relative dates like 'tomorrow', 'next Friday', 'end of month'. "
+        "CALENDAR RULE: If something involves a date or time — appointments, meetings, reminders, tasks, deadlines, calls — ALWAYS use create_calendar_event. It saves to memory automatically, so do NOT also call save_memory. "
+        "MEMORY RULE: Use save_memory only for timeless facts with no specific date — e.g. 'user is vegetarian', 'sister is called Sarah', 'prefers morning calls'. "
+        "DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically. "
+        "STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics. "
+        "SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above."
     )
-    dynamic_memory = memory_context if memory_context else "Memory database: empty — nothing saved yet."
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    dynamic_memory = f"Today's date: {today}\n\n" + (memory_context if memory_context else "Memory database: empty — nothing saved yet.")
 
     claude = claude_client.get_client()
     messages = [{"role": "user", "content": text}]
@@ -82,7 +82,7 @@ def _process_message(text: str) -> str:
                 {"type": "text", "text": static_rules, "cache_control": {"type": "ephemeral"}},
                 {"type": "text", "text": dynamic_memory},
             ],
-            tools=claude_client.TOOLS,
+            tools=claude_client.get_tools(),
             messages=messages,
         )
 
