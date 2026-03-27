@@ -1,3 +1,18 @@
+resource "aws_dynamodb_table" "lunch_ideas" {
+  name         = "${var.project_name}-lunch-ideas"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
 resource "aws_dynamodb_table" "memories" {
   name         = "${var.project_name}-memories"
   billing_mode = "PAY_PER_REQUEST" # No provisioned capacity — cheapest for personal use

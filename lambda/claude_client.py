@@ -158,6 +158,41 @@ TOOLS = [
         },
     },
     {
+        "name": "add_lunch_idea",
+        "description": (
+            "Add a lunch idea to the daily rotation. "
+            "Use when the user says something like 'add sushi to my lunch ideas' or 'save pasta as a lunch option'. "
+            "Always call this tool exactly ONCE per user request — treat everything the user mentions as a single meal idea."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "A complete meal name, e.g. 'Chicken salad', 'Salmon with roasted vegetables'",
+                }
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "remove_lunch_idea",
+        "description": (
+            "Remove a lunch idea from the daily rotation. "
+            "Use when the user says something like 'remove sushi from my lunch ideas' or 'delete pasta from the list'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The name of the lunch idea to remove.",
+                }
+            },
+            "required": ["name"],
+        },
+    },
+    {
         "name": "save_memory",
         "description": (
             "Save a timeless fact about the user — something with no specific date. "

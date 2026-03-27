@@ -74,27 +74,21 @@ def delete(memory_id: str) -> None:
     print(f"Memory deleted: {memory_id}")
 
 
+_CHAT_ID_KEY = "__chat_id__"
 
-_CONVERSATION_ID = "__conversation__"
 
-
-def save_last_conversation(user_msg: str, assistant_reply: str) -> None:
-    """Overwrite the single last-conversation item in DynamoDB."""
+def save_chat_id(chat_id: int) -> None:
+    """Persist the user's Telegram chat ID for use by scheduled jobs."""
     table = get_dynamodb().Table(os.environ["DYNAMODB_TABLE"])
-    table.put_item(Item={
-        "id": _CONVERSATION_ID,
-        "type": "conversation",
-        "user": user_msg,
-        "assistant": assistant_reply,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    table.put_item(Item={"id": _CHAT_ID_KEY, "value": str(chat_id)})
 
 
-def load_last_conversation() -> dict | None:
-    """Return the last conversation item, or None if none exists."""
+def load_chat_id() -> int | None:
+    """Return the stored Telegram chat ID, or None if not yet saved."""
     table = get_dynamodb().Table(os.environ["DYNAMODB_TABLE"])
-    response = table.get_item(Key={"id": _CONVERSATION_ID})
-    return response.get("Item")
+    response = table.get_item(Key={"id": _CHAT_ID_KEY})
+    item = response.get("Item")
+    return int(item["value"]) if item else None
 
 
 def format_for_prompt(memories: list[dict]) -> str:
@@ -108,7 +102,7 @@ def format_for_prompt(memories: list[dict]) -> str:
     today = datetime.now(timezone.utc).date().isoformat()
     lines = ["Things I remember about you (ID shown for deletion reference):"]
     for m in memories:
-        if m.get("type") == "conversation":
+        if m.get("id", "").startswith("__"):
             continue
         item_date = m.get("date")
         if item_date and item_date < today:

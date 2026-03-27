@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 import claude_client
 import google_calendar
+import lunch_ideas
 import memory
 from messenger import Messenger
 from telegram import TelegramMessenger
@@ -34,6 +35,7 @@ def lambda_handler(event, context):
         return {"statusCode": 200, "body": "ok"}
 
     print(f"Message from {chat_id}: {text}")
+    memory.save_chat_id(chat_id)
 
     try:
         reply = _process_message(text)
@@ -66,20 +68,14 @@ def _process_message(text: str) -> str:
         "DELETE RULE: When the user asks to cancel, delete, or forget something: use delete_memory — it will also remove any linked calendar event automatically. "
         "STUDY RULE: When the user says they studied/learned/revised a topic, use schedule_study_review with day=0. If they say they did their Day 7 review, use day=7. Day 30 review, use day=30. Never use save_memory or create_calendar_event for study topics. "
         "SEARCH RULE: When the user asks about events in a specific time period ('what do I have this week', 'anything next month'), use search_memories with the appropriate date range — do not rely on the memory list above. "
-        "RECURRING RULE: When the user mentions any repeating schedule ('every week', 'every day', 'every month', 'recurring', 'each week', etc.), use create_recurring_event ONCE — it handles both the first occurrence and all future repeats. Do NOT also call create_calendar_event. Do NOT call create_recurring_event more than once for the same event."
+        "RECURRING RULE: When the user mentions any repeating schedule ('every week', 'every day', 'every month', 'recurring', 'each week', etc.), use create_recurring_event ONCE — it handles both the first occurrence and all future repeats. Do NOT also call create_calendar_event. Do NOT call create_recurring_event more than once for the same event. "
+        "LUNCH RULE: When the user wants to add a lunch idea, call add_lunch_idea exactly ONCE — combine everything they mention into one meal name. Never split a single request into multiple calls. Use remove_lunch_idea to remove. Do NOT use save_memory for lunch ideas."
     )
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     dynamic_memory = f"Today's date: {today}\n\n" + (memory_context if memory_context else "Memory database: empty — nothing saved yet.")
 
     claude = claude_client.get_client()
-    last_convo = memory.load_last_conversation()
-    messages = []
-    if last_convo:
-        age = datetime.now(timezone.utc) - datetime.fromisoformat(last_convo["created_at"])
-        if age.total_seconds() < 600:  # only include if within the last 10 minutes
-            messages.append({"role": "user", "content": last_convo["user"]})
-            messages.append({"role": "assistant", "content": last_convo["assistant"]})
-    messages.append({"role": "user", "content": text})
+    messages = [{"role": "user", "content": text}]
     max_iterations = 10
 
     for _ in range(max_iterations):
@@ -95,12 +91,7 @@ def _process_message(text: str) -> str:
         )
 
         if response.stop_reason == "end_turn":
-            reply = next(
-                (b.text for b in response.content if b.type == "text"), ""
-            )
-            print(f"Reply: {reply[:100]}")
-            memory.save_last_conversation(text, reply)
-            return reply
+            return response.content[0].text
 
         # Handle tool calls — run in parallel if multiple blocks
         tool_blocks = [b for b in response.content if b.type == "tool_use"]
@@ -217,6 +208,24 @@ def _handle_tool(block, original_text: str, memories: list[dict]) -> dict:
                 "type": "tool_result",
                 "tool_use_id": block.id,
                 "content": content,
+            }
+
+        elif block.name == "add_lunch_idea":
+            name = block.input["name"]
+            lunch_ideas.add(name)
+            return {
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": f"Added '{name}' to your lunch rotation.",
+            }
+
+        elif block.name == "remove_lunch_idea":
+            name = block.input["name"]
+            found = lunch_ideas.remove(name)
+            return {
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": f"Removed '{name}' from your lunch rotation." if found else f"'{name}' wasn't found in your lunch ideas.",
             }
 
         elif block.name == "schedule_study_review":

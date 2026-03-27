@@ -12,6 +12,8 @@ lambda/*
 !lambda/memory.py
 !lambda/claude_client.py
 !lambda/messenger.py
+!lambda/lunch_ideas.py
+!lambda/scheduler.py
 
 # Lambda build artefact
 lambda.zip
