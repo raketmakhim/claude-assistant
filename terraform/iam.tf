@@ -38,7 +38,10 @@ resource "aws_iam_policy" "dynamodb_access" {
           "dynamodb:Scan",
           "dynamodb:Query"
         ]
-        Resource = aws_dynamodb_table.memories.arn
+        Resource = [
+            aws_dynamodb_table.memories.arn,
+            aws_dynamodb_table.lunch_ideas.arn,
+          ]
       }
     ]
   })
